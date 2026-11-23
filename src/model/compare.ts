@@ -98,6 +98,62 @@ export function compare(input: ScenarioInput): Comparison {
   };
 }
 
+export type TeamUnitInput = {
+  classicRate: number;
+  podRate: number;
+  productivity: number;
+};
+
+/** Compare people alone, ordinary AI tools, and the pods in a configuration. */
+export function compareTeam(input: {
+  classicHours: number;
+  laterShare: number;
+  toolsLaterGrowth: number;
+  units: TeamUnitInput[];
+}): Comparison {
+  const hours = Math.max(1, input.classicHours);
+  const laterShare = clamp(input.laterShare, 0.1, 0.7);
+  const toolsLaterGrowth = clamp(
+    input.toolsLaterGrowth,
+    0,
+    maxToolsLaterGrowth(laterShare),
+  );
+  const units = input.units.length
+    ? input.units
+    : [{ classicRate: 100, podRate: 100, productivity: 0 }];
+  const classicRate = units.reduce((sum, unit) => sum + Math.max(0, unit.classicRate), 0);
+  const podRate = units.reduce((sum, unit) => sum + Math.max(0, unit.podRate), 0);
+  const baseline = hours * classicRate;
+  const early = hours * (1 - laterShare);
+  const later = hours * laterShare;
+  const toolsEarly = early * (1 - TOOLS_EARLY_CUT);
+  const toolsLater = later * (1 + toolsLaterGrowth);
+  const toolsHours = toolsEarly + toolsLater;
+
+  const podPrice = units.reduce((sum, unit) => {
+    const share = clamp(unit.productivity, 0, 0.85);
+    return sum + Math.max(0, unit.podRate) * hours * (1 - share);
+  }, 0);
+  const podHours = podRate > 0 ? podPrice / podRate : hours;
+  const shrink = hours === 0 ? 0 : Math.max(0, 1 - podHours / hours);
+  const podEarly = Math.min(early * (1 - 0.1 * Math.min(1, shrink * 4)), podHours);
+  const podLater = Math.max(0, podHours - podEarly);
+
+  return {
+    classical: offer("classical", early, later, classicRate, baseline, hours, baseline),
+    tools: offer(
+      "tools",
+      toolsEarly,
+      toolsLater,
+      classicRate,
+      toolsHours * classicRate,
+      hours,
+      baseline,
+    ),
+    pod: offer("pod", podEarly, podLater, podRate, podPrice, hours, baseline),
+  };
+}
+
 function offer(
   id: OfferId,
   earlyHours: number,

@@ -1,11 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ConfigurePage, loadTeamSheet, type Sheet } from "./ConfigurePage";
 import { EstimatePage } from "./EstimatePage";
 import { appHref, appPath } from "./paths";
+import { teamUnits, type TeamUnit } from "./model/configure";
 import {
   DEFAULT_SCENARIO,
+  type Comparison,
   type Offer,
   type ScenarioInput,
-  compare,
+  compareTeam,
   maxToolsLaterGrowth,
   hoursLabel,
   money,
@@ -49,7 +52,7 @@ const OFFERS: {
     kicker: "You buy a pilot, expert skills, and a defined process",
     title: "The 99x pod",
     summary:
-      "The work moves earlier. Vetted skills and a defined process keep the later stages small, so your total comes down.",
+      "This is the setup above. The skills are priced once, the later stages shrink, and your total comes down.",
     includes: [
       "The judgement happens early, before the build runs ahead",
       "Expert agents that are vetted, and rated for how much they may do",
@@ -59,24 +62,18 @@ const OFFERS: {
   },
 ];
 
-function isEstimatePath(path: string) {
-  return path === "/estimate" || path === "/estimate/";
-}
-
 export function App() {
-  if (isEstimatePath(appPath())) {
-    return (
-      <div className="page">
-        <SiteHeader current="estimate" />
-        <EstimatePage />
-      </div>
-    );
-  }
-
-  return <ComparePage />;
+  const path = appPath();
+  const estimate = path === "/estimate";
+  return (
+    <div className="page">
+      <SiteHeader current={estimate ? "estimate" : "configure"} />
+      {estimate ? <EstimatePage /> : <MainPage />}
+    </div>
+  );
 }
 
-function SiteHeader({ current }: { current: "compare" | "estimate" }) {
+function SiteHeader({ current }: { current: "compare" | "estimate" | "configure" }) {
   return (
     <header className="site-header">
       <div className="wrap nav">
@@ -85,7 +82,14 @@ function SiteHeader({ current }: { current: "compare" | "estimate" }) {
           <span>Pod delivery</span>
         </a>
         <nav className="nav-links" aria-label="Pages">
-          <a className="nav-link" href={appHref("/")} aria-current={current === "compare" ? "page" : undefined}>
+          <a
+            className="nav-link"
+            href={appHref("#configure")}
+            aria-current={current === "configure" ? "page" : undefined}
+          >
+            Configure
+          </a>
+          <a className="nav-link" href={appHref("#compare")}>
             Compare
           </a>
           <a
@@ -109,29 +113,44 @@ function SiteHeader({ current }: { current: "compare" | "estimate" }) {
   );
 }
 
-function ComparePage() {
+function MainPage() {
+  const [sheet, setSheet] = useState<Sheet>(loadTeamSheet);
   const [scenario, setScenario] = useState<ScenarioInput>(DEFAULT_SCENARIO);
-  const offers = useMemo(() => compare(scenario), [scenario]);
+  const units = useMemo(
+    () => teamUnits(sheet.experts, sheet.crossovers),
+    [sheet],
+  );
+  const offers = useMemo(
+    () =>
+      compareTeam({
+        classicHours: scenario.classicHours,
+        laterShare: scenario.laterShare,
+        toolsLaterGrowth: scenario.toolsLaterGrowth,
+        units,
+      }),
+    [scenario.classicHours, scenario.laterShare, scenario.toolsLaterGrowth, units],
+  );
+
+  useEffect(() => {
+    document.title = "99x · Set up the pods, then compare";
+  }, []);
 
   function update(patch: Partial<ScenarioInput>) {
     setScenario((current) => ({ ...current, ...patch }));
   }
 
   return (
-    <div className="page">
-      <SiteHeader current="compare" />
-
-      <main className="wrap">
-        <section className="hero" id="compare">
+    <>
+      <ConfigurePage onChange={setSheet} />
+      <main className="wrap compare-block">
+        <section className="compare-intro" id="compare">
           <p className="eyebrow">The same outcome, for you</p>
-          <h1>Three ways you can buy this work.</h1>
+          <h2>Three ways you can buy this setup.</h2>
           <p className="lede">
-            Ordinary AI tools can make the start look faster. Without a defined
-            process and vetted skills, some of those hours come back in the
-            later stages. You still pay less than with people alone. A 99x pod
-            shifts the work left. The pilot and the expert skills take the
-            judgement early, the later stages shrink further, and your cost
-            comes down again.
+            The prices below use the experts, the skills, and the cross-overs
+            you set above. People alone stay the highest price. Ordinary AI
+            tools still cost less than that. This pod setup costs less again,
+            because the skills shorten the later stages.
           </p>
         </section>
 
@@ -153,7 +172,7 @@ function ComparePage() {
           ))}
         </section>
 
-        <Reading offers={offers} scenario={scenario} />
+        <Reading offers={offers} units={units} name={sheet.name} />
 
         <section className="definition">
           <div>
@@ -183,9 +202,9 @@ function ComparePage() {
 
       <footer className="wrap">
         <p>
-          These figures are for your conversation with us. A quote is separate.
-          Autopilot costs are separate from the pod hour. The skills and the
-          process are the ones you can see on{" "}
+          These figures are the scale for this conversation, not a rate card.
+          A quote is separate. Autopilot costs stay outside the pod hour. The
+          skills are the expert agents on{" "}
           <a
             href="https://xianix-team.github.io/copilots-studio/"
             target="_blank"
@@ -196,7 +215,7 @@ function ComparePage() {
           .
         </p>
       </footer>
-    </div>
+    </>
   );
 }
 
@@ -222,7 +241,7 @@ function Estimator({
           man hours and in pod hours.
         </p>
 
-      <div className="fields">
+        <div className="fields">
         <label>
           Your hours today
           <input
@@ -233,16 +252,6 @@ function Estimator({
             onChange={(event) =>
               onChange({ classicHours: Number(event.target.value) })
             }
-          />
-        </label>
-        <label>
-          Your rate today
-          <input
-            type="number"
-            min={0}
-            step={1}
-            value={scenario.rate}
-            onChange={(event) => onChange({ rate: Number(event.target.value) })}
           />
         </label>
       </div>
@@ -260,18 +269,6 @@ function Estimator({
           value={Math.min(scenario.toolsLaterGrowth, maxToolsLaterGrowth(scenario.laterShare))}
           max={Math.round(maxToolsLaterGrowth(scenario.laterShare) * 100)}
           onChange={(toolsLaterGrowth) => onChange({ toolsLaterGrowth })}
-        />
-        <Slider
-          label="How much the pod shortens those later stages"
-          value={scenario.podLaterCut}
-          max={85}
-          onChange={(podLaterCut) => onChange({ podLaterCut })}
-        />
-        <Slider
-          label="Share of the pod’s saving you get back in the price"
-          value={scenario.returnedShare}
-          max={100}
-          onChange={(returnedShare) => onChange({ returnedShare })}
         />
       </div>
     </form>
@@ -362,16 +359,25 @@ function OfferCard({
 
 function Reading({
   offers,
-  scenario,
+  units,
+  name,
 }: {
-  offers: ReturnType<typeof compare>;
-  scenario: ScenarioInput;
+  offers: Comparison;
+  units: TeamUnit[];
+  name: string;
 }) {
   const toolsSaving = offers.classical.price - offers.tools.price;
   const podVersusToday = offers.classical.price - offers.pod.price;
+  const setup = units
+    .map((unit) => `${unit.name} at ${rateLabel(unit.podRate)}`)
+    .join(", ");
+  const team = name.trim() ? `For ${name.trim()}, people` : "People";
 
   return (
     <section className="reading" aria-label="What this means for you">
+      <p>
+        {team} alone are {rateLabel(offers.classical.rate)}. This setup is {setup || "the experts above"}.
+      </p>
       <p>
         With ordinary AI tools the early work falls to {hoursLabel(offers.tools.earlyHours)}.
         The later stages grow to {hoursLabel(offers.tools.laterHours)}, against{" "}
@@ -382,13 +388,12 @@ function Reading({
       <p>
         The pod keeps {hoursLabel(offers.pod.earlyHours)} in the early work, where the
         judgement happens, and brings the later stages down to {hoursLabel(offers.pod.laterHours)}.
-        You pay {money(offers.pod.price)}, which is {money(Math.abs(podVersusToday))}{" "}
-        {podVersusToday >= 0 ? "less than today" : "more than today"}.
-      </p>
-      <p>
-        {percent(scenario.returnedShare)} of the hours the pod removes comes back to you
-        in a lower price. You pay {rateLabel(offers.pod.rate)} for a pod hour, against{" "}
-        {rateLabel(offers.classical.rate)} today.
+        You pay {money(offers.pod.price)}
+        {podVersusToday > 1
+          ? `, which is ${money(podVersusToday)} less than today`
+          : ", the same as people alone until skills are in the hour"}
+        . You pay {rateLabel(offers.pod.rate)} for the configured pods, against{" "}
+        {rateLabel(offers.classical.rate)} with people alone.
       </p>
     </section>
   );
