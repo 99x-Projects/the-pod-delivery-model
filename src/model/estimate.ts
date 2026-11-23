@@ -20,8 +20,8 @@ export type HourRollup = {
 };
 
 /** One-sided normal quantiles. The commit sits this many spreads above the expected hours. */
-const Z_85 = 1.0364333894937896;
-const Z_95 = 1.6448536269514722;
+export const COMMIT_Z_85 = 1.0364333894937896;
+export const COMMIT_Z_95 = 1.6448536269514722;
 
 export function blankPoint(): TriPoint {
   return { optimistic: 0, likely: 0, pessimistic: 0 };
@@ -57,8 +57,8 @@ export function rollup(points: TriPoint[]): HourRollup {
     likely,
     expected,
     spread,
-    commit85: expected + Z_85 * spread,
-    commit95: expected + Z_95 * spread,
+    commit85: expected + COMMIT_Z_85 * spread,
+    commit95: expected + COMMIT_Z_95 * spread,
   };
 }
 

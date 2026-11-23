@@ -275,6 +275,28 @@ h2,
   background: var(--framework-tint);
 }
 
+.icon-x {
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.32rem;
+  padding: 0;
+  border: 1px solid #e4b4b4;
+  border-radius: var(--radius-s);
+  background: #fdf6f6;
+  color: #9d2c2c;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-x:hover {
+  background: #9d2c2c;
+  border-color: #9d2c2c;
+  color: #fff;
+}
+
 .sheet .expected {
   font-variant-numeric: tabular-nums;
   font-weight: 600;

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { money, rateLabel } from "./model/compare";
+import { downloadEstimateWorkbook } from "./model/estimateExport";
 import {
   EXAMPLE_ITEMS,
   type EstimateItem,
@@ -223,10 +224,11 @@ export function EstimatePage() {
                       <td>
                         <button
                           type="button"
-                          className="pill"
+                          className="icon-x"
+                          aria-label={`Remove ${label}`}
                           onClick={() => removeItem(item.id)}
                         >
-                          Remove
+                          <span aria-hidden="true">×</span>
                         </button>
                       </td>
                     </tr>
@@ -274,6 +276,9 @@ export function EstimatePage() {
           <p className="sheet-actions">
             <button type="button" className="pill" onClick={() => void copySummary()}>
               {copied ? "Copied" : "Copy the summary"}
+            </button>
+            <button type="button" className="pill" onClick={() => void downloadEstimateWorkbook(sheet)}>
+              Download Excel
             </button>
           </p>
         </section>
