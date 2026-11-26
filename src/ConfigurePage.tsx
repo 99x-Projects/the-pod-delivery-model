@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { rateLabel } from "./model/compare";
 import {
-  CLASSIC_RATE,
   ROLES,
   SUGGESTED_SKILLS,
   type Crossover,
@@ -12,6 +11,7 @@ import {
   priceTeam,
   roleById,
 } from "./model/configure";
+import { DEFAULT_RATES, TIER_ORDER, tierLabel, type TierRates } from "./model/rates";
 import { SKILL_STORES, SKILLS, type Skill } from "./model/skills";
 
 const STORAGE_KEY = "pod-configurator-v1";
@@ -24,12 +24,18 @@ export type Sheet = {
 
 const LEVELS: Level[] = ["low", "medium", "high"];
 
-export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void }) {
+export function ConfigurePage({
+  onChange,
+  rates = DEFAULT_RATES,
+}: {
+  onChange?: (sheet: Sheet) => void;
+  rates?: TierRates;
+}) {
   const [sheet, setSheet] = useState<Sheet>(loadSheet);
   const [copied, setCopied] = useState(false);
   const priced = useMemo(
-    () => priceTeam(sheet.experts, sheet.crossovers),
-    [sheet.experts, sheet.crossovers],
+    () => priceTeam(sheet.experts, sheet.crossovers, rates),
+    [sheet.experts, sheet.crossovers, rates],
   );
 
   useEffect(() => {
@@ -124,9 +130,9 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
           <h1>Set up the pods.</h1>
           <p className="lede">
             Choose each expert, then the skills that work with them. A pod is
-            that             one expert and those skills. When two or more experts share
+            that one expert and those skills. When two or more experts share
             the same work, put them in a cross-over. You pay for the shared
-            skills once, and for each other expert at the judgement they bring.
+            skills once, and for each other expert at the tier they bring.
             The comparison below is this setup.
           </p>
         </section>
@@ -176,6 +182,7 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
                 onRole={(role) =>
                   updateExpert(expert.id, { role, judgement: roleById(role).judgement })
                 }
+                rates={rates}
                 onJudgement={(judgement) => updateExpert(expert.id, { judgement })}
                 onToggleSkill={(skillId) => toggleSkill(expert.id, skillId)}
                 onRemove={() => removeExpert(expert.id)}
@@ -293,8 +300,8 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
                   <dd>{rateLabel(group.profileRate)}</dd>
                 </div>
                 <div>
-                  <dt>Judgement</dt>
-                  <dd>{labelLevel(group.judgement)}</dd>
+                  <dt>Tier</dt>
+                  <dd>{tierLabel(group.judgement)}</dd>
                 </div>
                 <div>
                   <dt>Skills, once</dt>
@@ -307,14 +314,14 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
               </dl>
               <ul>
                 <li>
-                  {expertLabel(group.holder.expert, sheet.experts)} holds the{" "}
-                  {labelLevel(group.judgement).toLowerCase()} judgement in the shared hour.
+                  {expertLabel(group.holder.expert, sheet.experts)} holds{" "}
+                  {tierLabel(group.judgement)} in the shared hour.
                 </li>
                 {group.others.map((pod) => (
                   <li key={pod.expert.id}>
                     {expertLabel(pod.expert, sheet.experts)} joins at{" "}
                     {rateLabel(pod.classicRate)}, the classic rate for{" "}
-                    {labelLevel(pod.expert.judgement).toLowerCase()} judgement.
+                    {tierLabel(pod.expert.judgement)}.
                   </li>
                 ))}
               </ul>
@@ -332,8 +339,8 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
               </p>
               <dl>
                 <div>
-                  <dt>Judgement</dt>
-                  <dd>{labelLevel(pod.expert.judgement)}</dd>
+                  <dt>Tier</dt>
+                  <dd>{tierLabel(pod.expert.judgement)}</dd>
                 </div>
                 <div>
                   <dt>Classic rate</dt>
@@ -350,17 +357,18 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
 
         <section className="reading" aria-label="How the pod rate is set">
           <p>
-            The pod hour rate follows the expert’s judgement, the skills in the
-            hour, and the autonomy those skills publish. Low, medium, and high
-            judgement start at {rateLabel(CLASSIC_RATE.low)}, {rateLabel(CLASSIC_RATE.medium)},
-            and {rateLabel(CLASSIC_RATE.high)}. More skills, and higher autonomy,
+            The pod hour rate follows the tier, the skills in the hour, and the
+            autonomy those skills publish. {tierLabel("high")}, {tierLabel("medium")},
+            and {tierLabel("low")} start at {rateLabel(rates.high)},{" "}
+            {rateLabel(rates.medium)}, and {rateLabel(rates.low)}. The control
+            in the header sets those rates. More skills, and higher autonomy,
             raise the rate and shorten the hours for the same outcome.
           </p>
           <p>
-            In a cross-over the skills are priced once, on the highest judgement
-            in that work. Each other expert is added at the classic rate for the
-            judgement they bring. You do not pay a second copy of the same
-            skills. An expert on different work stays a separate pod.
+            In a cross-over the skills are priced once, on the highest tier in
+            that work. Each other expert is added at the classic rate for the
+            tier they bring. You do not pay a second copy of the same skills.
+            An expert on different work stays a separate pod.
           </p>
           <p className="sheet-actions">
             <button type="button" className="pill" onClick={() => void copySummary()}>
@@ -376,6 +384,7 @@ export function ConfigurePage({ onChange }: { onChange?: (sheet: Sheet) => void 
 function ExpertCard({
   expert,
   experts,
+  rates,
   onRole,
   onJudgement,
   onToggleSkill,
@@ -383,6 +392,7 @@ function ExpertCard({
 }: {
   expert: Expert;
   experts: Expert[];
+  rates: TierRates;
   onRole: (role: RoleId) => void;
   onJudgement: (judgement: Level) => void;
   onToggleSkill: (skillId: string) => void;
@@ -410,14 +420,14 @@ function ExpertCard({
           </select>
         </label>
         <label>
-          Judgement
+          Tier
           <select
             value={expert.judgement}
             onChange={(event) => onJudgement(event.target.value as Level)}
           >
-            {LEVELS.map((level) => (
+            {TIER_ORDER.map((level) => (
               <option key={level} value={level}>
-                {labelLevel(level)} · {rateLabel(CLASSIC_RATE[level])}
+                {tierLabel(level)} · {rateLabel(rates[level])}
               </option>
             ))}
           </select>

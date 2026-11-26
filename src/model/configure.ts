@@ -1,13 +1,7 @@
+import { DEFAULT_RATES, type TierRates } from "./rates";
 import { SKILLS, skillById, type Level, type RoleId, type Skill } from "./skills";
 
 export type { Level, RoleId, Skill };
-
-/** Scale-model classic rates. Not a rate card. */
-export const CLASSIC_RATE: Record<Level, number> = {
-  low: 80,
-  medium: 100,
-  high: 140,
-};
 
 const KEEP_SHARE = 0.5;
 
@@ -76,8 +70,13 @@ export function productivity(autonomy: Level, skillCount: number) {
   return Math.min(0.52, 0.45 + extra * 0.02);
 }
 
-export function podHourRate(judgement: Level, autonomy: Level | null, skillCount: number) {
-  const classic = CLASSIC_RATE[judgement];
+export function podHourRate(
+  judgement: Level,
+  autonomy: Level | null,
+  skillCount: number,
+  rates: TierRates = DEFAULT_RATES,
+) {
+  const classic = rates[judgement];
   const share = autonomy ? productivity(autonomy, skillCount) : 0;
   if (share <= 0) return classic;
   return Math.round((classic * (1 - share * KEEP_SHARE)) / (1 - share));
@@ -87,7 +86,7 @@ export function skillsFor(ids: string[]) {
   return ids.map((id) => skillById(id)).filter((skill): skill is Skill => Boolean(skill));
 }
 
-export function pricePod(expert: Expert): PodPrice {
+export function pricePod(expert: Expert, rates: TierRates = DEFAULT_RATES): PodPrice {
   const skills = skillsFor(expert.skillIds);
   const autonomy = highest(skills.map((skill) => skill.autonomy));
   const share = autonomy ? productivity(autonomy, skills.length) : 0;
@@ -96,13 +95,17 @@ export function pricePod(expert: Expert): PodPrice {
     skills,
     autonomy,
     productivity: share,
-    classicRate: CLASSIC_RATE[expert.judgement],
-    rate: podHourRate(expert.judgement, autonomy, skills.length),
+    classicRate: rates[expert.judgement],
+    rate: podHourRate(expert.judgement, autonomy, skills.length, rates),
   };
 }
 
-export function priceTeam(experts: Expert[], crossovers: Crossover[]) {
-  const priced = new Map(experts.map((expert) => [expert.id, pricePod(expert)]));
+export function priceTeam(
+  experts: Expert[],
+  crossovers: Crossover[],
+  rates: TierRates = DEFAULT_RATES,
+) {
+  const priced = new Map(experts.map((expert) => [expert.id, pricePod(expert, rates)]));
   const grouped = new Set(
     crossovers.filter((group) => group.expertIds.length >= 2).flatMap((group) => group.expertIds),
   );
@@ -121,7 +124,7 @@ export function priceTeam(experts: Expert[], crossovers: Crossover[]) {
       const judgement = highest(members.map((pod) => pod.expert.judgement)) ?? "medium";
       const holder = members.find((pod) => pod.expert.judgement === judgement) ?? members[0];
       const others = members.filter((pod) => pod.expert.id !== holder.expert.id);
-      const profileRate = podHourRate(judgement, autonomy, skills.length);
+      const profileRate = podHourRate(judgement, autonomy, skills.length, rates);
       const stacked = members.reduce((sum, pod) => sum + pod.rate, 0);
       const raw = profileRate + others.reduce((sum, pod) => sum + pod.classicRate, 0);
       const rate = skills.length > 0 && raw >= stacked ? stacked - 1 : raw;
@@ -155,8 +158,12 @@ export type TeamUnit = {
 };
 
 /** The priced pieces of a setup: each cross-over, then each expert on separate work. */
-export function teamUnits(experts: Expert[], crossovers: Crossover[]): TeamUnit[] {
-  const priced = priceTeam(experts, crossovers);
+export function teamUnits(
+  experts: Expert[],
+  crossovers: Crossover[],
+  rates: TierRates = DEFAULT_RATES,
+): TeamUnit[] {
+  const priced = priceTeam(experts, crossovers, rates);
   return [
     ...priced.groups.map((group) => ({
       name: group.crossover.name.trim() || "Cross-over",

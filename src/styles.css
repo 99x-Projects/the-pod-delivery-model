@@ -114,11 +114,70 @@ h2,
   letter-spacing: -0.02em;
 }
 
+.nav-end {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .nav-links {
   display: flex;
   align-items: center;
   gap: 1.25rem;
   flex-wrap: wrap;
+}
+
+.gear {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--pine);
+  cursor: pointer;
+}
+
+.gear:hover {
+  background: var(--paper-sunk);
+}
+
+.rate-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  margin: auto;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  padding: 1.35rem 1.5rem 1.1rem;
+}
+
+.rate-dialog::backdrop {
+  background: color-mix(in srgb, var(--pine) 40%, transparent);
+}
+
+.rate-dialog h2 {
+  margin: 0.25rem 0 0.6rem;
+  font-size: var(--step-2);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--pine);
+}
+
+.rate-dialog > p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.rate-dialog .fields {
+  grid-template-columns: 1fr;
+  margin-top: 0;
+}
+
+.rate-dialog .sheet-actions {
+  margin: 1rem 0 0.25rem;
 }
 
 .nav-link {
@@ -905,7 +964,8 @@ footer a {
 
 @media print {
   .site-header,
-  .sheet-actions {
+  .sheet-actions,
+  .rate-dialog {
     display: none;
   }
 

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { ConfigurePage, loadTeamSheet, type Sheet } from "./ConfigurePage";
 import { EstimatePage } from "./EstimatePage";
+import { RateSettings } from "./RateSettings";
 import { appHref, appPath } from "./paths";
 import { teamUnits, type TeamUnit } from "./model/configure";
+import { loadRates, saveRates, type TierRates } from "./model/rates";
 import {
   DEFAULT_SCENARIO,
   type Comparison,
@@ -65,15 +67,29 @@ const OFFERS: {
 export function App() {
   const path = appPath();
   const estimate = path === "/estimate";
+  const [rates, setRates] = useState<TierRates>(loadRates);
+
+  useEffect(() => {
+    saveRates(rates);
+  }, [rates]);
+
   return (
     <div className="page">
-      <SiteHeader current={estimate ? "estimate" : "configure"} />
-      {estimate ? <EstimatePage /> : <MainPage />}
+      <SiteHeader current={estimate ? "estimate" : "configure"} rates={rates} onRates={setRates} />
+      {estimate ? <EstimatePage /> : <MainPage rates={rates} />}
     </div>
   );
 }
 
-function SiteHeader({ current }: { current: "compare" | "estimate" | "configure" }) {
+function SiteHeader({
+  current,
+  rates,
+  onRates,
+}: {
+  current: "compare" | "estimate" | "configure";
+  rates: TierRates;
+  onRates: (rates: TierRates) => void;
+}) {
   return (
     <header className="site-header">
       <div className="wrap nav">
@@ -81,44 +97,47 @@ function SiteHeader({ current }: { current: "compare" | "estimate" | "configure"
           <img src={appHref("/99x-logo.svg")} alt="99x" width="74" height="38" />
           <span>Pod delivery</span>
         </a>
-        <nav className="nav-links" aria-label="Pages">
-          <a
-            className="nav-link"
-            href={appHref("#configure")}
-            aria-current={current === "configure" ? "page" : undefined}
-          >
-            Configure
-          </a>
-          <a className="nav-link" href={appHref("#compare")}>
-            Compare
-          </a>
-          <a
-            className="nav-link"
-            href={appHref("/estimate")}
-            aria-current={current === "estimate" ? "page" : undefined}
-          >
-            Estimate
-          </a>
-          <a
-            className="nav-link"
-            href="https://xianix-team.github.io/copilots-studio/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Copilots Studio
-          </a>
-        </nav>
+        <div className="nav-end">
+          <nav className="nav-links" aria-label="Pages">
+            <a
+              className="nav-link"
+              href={appHref("#configure")}
+              aria-current={current === "configure" ? "page" : undefined}
+            >
+              Configure
+            </a>
+            <a className="nav-link" href={appHref("#compare")}>
+              Compare
+            </a>
+            <a
+              className="nav-link"
+              href={appHref("/estimate")}
+              aria-current={current === "estimate" ? "page" : undefined}
+            >
+              Estimate
+            </a>
+            <a
+              className="nav-link"
+              href="https://xianix-team.github.io/copilots-studio/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Copilots Studio
+            </a>
+          </nav>
+          <RateSettings rates={rates} onChange={onRates} />
+        </div>
       </div>
     </header>
   );
 }
 
-function MainPage() {
+function MainPage({ rates }: { rates: TierRates }) {
   const [sheet, setSheet] = useState<Sheet>(loadTeamSheet);
   const [scenario, setScenario] = useState<ScenarioInput>(DEFAULT_SCENARIO);
   const units = useMemo(
-    () => teamUnits(sheet.experts, sheet.crossovers),
-    [sheet],
+    () => teamUnits(sheet.experts, sheet.crossovers, rates),
+    [sheet, rates],
   );
   const offers = useMemo(
     () =>
@@ -141,7 +160,7 @@ function MainPage() {
 
   return (
     <>
-      <ConfigurePage onChange={setSheet} />
+      <ConfigurePage onChange={setSheet} rates={rates} />
       <main className="wrap compare-block">
         <section className="compare-intro" id="compare">
           <p className="eyebrow">The same outcome, for you</p>
